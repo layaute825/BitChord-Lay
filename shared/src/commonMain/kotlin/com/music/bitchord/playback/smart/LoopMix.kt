@@ -207,6 +207,14 @@ object LoopMix {
 
         val fold = doubleArrayOf(1.0, 2.0, 0.5).minBy { abs(ln(inBpm / it / outBpm)) }
         val target = inBpm / fold
+        // This renderer relies on time-stretching both decks to follow a shared
+        // tempo ramp. On mobile, retain the original recording speed instead:
+        // decline the loop mix when a ramp would be required and let the
+        // ordinary no-stretch Automix plan handle the pair.
+        if (!stretchReachable(outBpm, target)) {
+            why?.append("tempo difference requires time-stretching")
+            return null
+        }
         val rampBars = ceil(abs(target - outBpm) / MAX_BPM_PER_BAR).toInt().coerceIn(MIN_RAMP_BARS, MAX_RAMP_BARS)
         // the incoming loop lets go only at its own loop boundary: round the mix up to whole incoming loops
         val inLoopOutBars = inPick.bars / fold

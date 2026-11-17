@@ -350,20 +350,13 @@ class CrossfadeController(
     private var incomingCueTimeMs: Long = 0L
 
     /**
-     * The tempo-stretch ratio applied to the incoming track for the
-     * transition, stacked on top of whatever [AppSettings.playbackSpeed] the
-     * listener already has set — 1.0 is a no-op. This is what actually
-     * beatmatches a BEATMATCHED-tier plan: without it, the two tracks blend
-     * at their own unrelated tempi and the result is a crossfade with
-     * smarter timing, not a beatmatch.
+     * Playback-rate factor for the incoming deck, stacked on the listener's
+     * [AppSettings.playbackSpeed]. The mobile no-stretch policy keeps this at
+     * 1.0 so the recording's tempo and timbre are preserved.
      */
     private var incomingPlaybackRate: Double = 1.0
 
-    /**
-     * Advanced Automix: the speed-up the outgoing track is brought up to before
-     * the blend, when it is the slower of the pair — see [rampOutgoing]. 1.0
-     * otherwise, and always 1.0 classically.
-     */
+    /** Kept for planner compatibility; mobile Automix also keeps this at 1.0. */
     private var outgoingPlaybackRate: Double = 1.0
 
     /** How much faster the incoming timeline runs than the outgoing one through the blend. */
@@ -1049,10 +1042,10 @@ class CrossfadeController(
      *
      * Reads the plan's timing (where the fade starts and how long it runs),
      * where the incoming track should be cued
-     * ([com.music.bitchord.playback.smart.TransitionPlan.incomingCueTime]),
-     * and the tempo-stretch to align it with the outgoing track
+     * ([com.music.bitchord.playback.smart.TransitionPlan.incomingCueTime]).
+     * Mobile plans keep the incoming song at its original playback speed
      * ([com.music.bitchord.playback.smart.TransitionPlan.incomingPlaybackRate])
-     * — see [driveLap], which applies both at the handoff — and the style the
+     * — see [driveLap], which applies the plan at handoff — and the style the
      * blend is rendered in
      * ([com.music.bitchord.playback.smart.TransitionPlan.transitionStyle]),
      * which [rideFilters] turns into a filter ride or a bass swap over the same

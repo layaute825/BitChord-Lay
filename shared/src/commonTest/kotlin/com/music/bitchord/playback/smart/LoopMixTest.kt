@@ -1,7 +1,6 @@
 package com.music.bitchord.playback.smart
 
 import kotlin.math.abs
-import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -99,21 +98,22 @@ class LoopMixTest {
     }
 
     @Test
-    fun rampsAnyTempoGapFoldingToDoubleOrHalfTimeWhenCloser() {
-        val near = assertNotNull(plan(analysis(120.0, 200.0), analysis(134.0, 180.0)))
-        assertEquals(1.0, near.fold)
-        assertEquals(ceil((134.0 - 120) / 2.5).toInt(), near.rampBars)
-        // 111 -> 169 is 58 BPM up, but only 26.5 down to 169's half time: that's the ramp taken
-        val wide = assertNotNull(plan(analysis(111.0, 200.0), analysis(169.0, 180.0)))
-        assertEquals(2.0, wide.fold)
-        assertEquals(ceil((111 - 169.0 / 2) / 2.5).toInt(), wide.rampBars)
-        val slow = assertNotNull(plan(analysis(170.0, 200.0), analysis(80.0, 180.0)))
-        assertEquals(0.5, slow.fold)
-        // the incoming loop can only let go at its own boundary
-        for (p in listOf(near, wide, slow)) {
-            val inLoopOutBars = LoopMix.LOOP_BARS / p.fold
-            assertEquals(0.0, p.totalBars % inLoopOutBars, 1e-9)
-        }
+    fun loopMixOnlyRunsWhenTheOriginalTempiAlreadyMatch() {
+        val matched = assertNotNull(plan(analysis(120.0, 200.0), analysis(120.0, 180.0)))
+        assertEquals(1.0, matched.fold)
+        assertEquals(120.0, matched.targetBpm, 1e-9)
+        assertEquals(LoopMix.MIN_RAMP_BARS, matched.rampBars)
+
+        // Even a close mismatch must not invoke the stretch renderer.
+        assertNull(plan(analysis(120.0, 200.0), analysis(122.0, 180.0)))
+        assertNull(plan(analysis(120.0, 200.0), analysis(134.0, 180.0)))
+        assertNull(plan(analysis(111.0, 200.0), analysis(169.0, 180.0)))
+        assertNull(plan(analysis(170.0, 200.0), analysis(80.0, 180.0)))
+
+        // Half-time is a natural beat-grid relationship, not a playback-rate change.
+        val halfTime = assertNotNull(plan(analysis(120.0, 200.0), analysis(60.0, 180.0)))
+        assertEquals(0.5, halfTime.fold)
+        assertEquals(120.0, halfTime.targetBpm, 1e-9)
     }
 
     @Test
@@ -150,7 +150,7 @@ class LoopMixTest {
 
     @Test
     fun clockWrapsOnlyAtLoopEndsAndTheIncomingSongArrivesAtItsOwnSpeed() {
-        val plan = assertNotNull(plan(analysis(111.0, 200.0), analysis(169.0, 180.0)))
+        val plan = assertNotNull(plan(analysis(111.0, 200.0), analysis(111.0, 180.0)))
         val clock = LoopMix.Clock(plan)
         // each beat's position follows from the last at the beat's own rate; a wrap only at a loop end
         for (side in LoopMix.Side.entries) {
@@ -186,7 +186,7 @@ class LoopMixTest {
 
     @Test
     fun positionIsNothingBeforeTheMixAndTheLoopStartOnItsFirstBeat() {
-        val plan = assertNotNull(plan(analysis(111.0, 200.0), analysis(169.0, 180.0)))
+        val plan = assertNotNull(plan(analysis(111.0, 200.0), analysis(111.0, 180.0)))
         val clock = LoopMix.Clock(plan)
         assertNull(LoopMix.positionAt(clock, LoopMix.Side.OUT, -0.1))
         assertEquals(plan.out.loopStart, LoopMix.positionAt(clock, LoopMix.Side.OUT, 0.0)!!, 1e-9)
@@ -195,7 +195,7 @@ class LoopMixTest {
 
     @Test
     fun positionStaysInsideEachLoopWrappingBackToItsStart() {
-        val plan = assertNotNull(plan(analysis(111.0, 200.0), analysis(169.0, 180.0)))
+        val plan = assertNotNull(plan(analysis(111.0, 200.0), analysis(111.0, 180.0)))
         val clock = LoopMix.Clock(plan)
         var sawWrap = false
         var last = -1.0
@@ -214,7 +214,7 @@ class LoopMixTest {
 
     @Test
     fun theIncomingSongGoesOnFromItsLoopEndInRealTimeAndTheOutgoingOneStops() {
-        val plan = assertNotNull(plan(analysis(111.0, 200.0), analysis(169.0, 180.0)))
+        val plan = assertNotNull(plan(analysis(111.0, 200.0), analysis(111.0, 180.0)))
         val clock = LoopMix.Clock(plan)
         assertNull(LoopMix.positionAt(clock, LoopMix.Side.OUT, clock.releaseAt + 0.1))
         assertEquals(plan.inn.loopEnd, LoopMix.positionAt(clock, LoopMix.Side.IN, clock.releaseAt)!!, 1e-9)
@@ -223,7 +223,7 @@ class LoopMixTest {
 
     @Test
     fun beatPhaseIsZeroOnEveryScheduledBeat() {
-        val plan = assertNotNull(plan(analysis(111.0, 200.0), analysis(169.0, 180.0)))
+        val plan = assertNotNull(plan(analysis(111.0, 200.0), analysis(111.0, 180.0)))
         val clock = LoopMix.Clock(plan)
         assertEquals(0.0, LoopMix.beatPhaseAt(clock, clock.beatTimes[5])!!, 1e-9)
         val mid = (clock.beatTimes[5] + clock.beatTimes[6]) / 2

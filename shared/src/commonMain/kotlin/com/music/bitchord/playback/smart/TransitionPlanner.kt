@@ -39,8 +39,8 @@ import kotlin.math.roundToLong
  * and *how* ambitious it is. [CrossfadeController] is what executes a plan: it
  * reads the timing fields ([TransitionPlan.transitionStart], [TransitionPlan.fadeSeconds]),
  * cues the incoming track to [TransitionPlan.incomingCueTime] instead of 0,
- * stretches it by [TransitionPlan.incomingPlaybackRate] to align tempo, and
- * renders [TransitionPlan.transitionStyle] as filtering across the blend —
+ * keeps both tracks at their original playback rates, and renders
+ * [TransitionPlan.transitionStyle] as filtering across the blend —
  * a closing low-pass over the outgoing track for [TransitionStyle.DJ_FILTER],
  * a low-end handover at [TransitionPlan.bassSwapFraction] for
  * [TransitionStyle.DJ_BLEND]. The gain curve underneath is equal-power in every
@@ -1078,9 +1078,8 @@ private fun phraseSwitch(
         nextDuration = nextLength,
         advanced = advanced,
     ) as? WsolaPlanResult.Planned ?: return null
-    // The incoming song is slowed by at most 10% and sped up by at most 25%;
-    // the audible outgoing song is never retimed. A phrase switch that needs
-    // more degrades to the vocal-aware filter planner below.
+    // Mobile playback never time-stretches: a phrase switch is only accepted
+    // when the two analysed tempi already match (including octave folding).
     if (planned.stretchRatio !in MIN_INCOMING_RATE..MAX_INCOMING_RATE) return null
 
     val overlap = planned.transitionEnd - planned.transitionStart
@@ -1139,11 +1138,9 @@ private data class Overlap(
 )
 
 /**
- * How fast the incoming track plays for a blend whose incoming timeline must
- * run [mediaRatio] times the outgoing one's: the ratio itself, inside the
- * stretch window ([MIN_INCOMING_RATE]..[MAX_INCOMING_RATE]), in both modes.
- * Changing the already-audible outgoing deck's AudioTrack rate causes
- * discontinuities on some Android routes, so only the incoming one moves.
+ * Mobile Automix keeps the incoming recording at its original playback rate.
+ * This helper clamps to the no-stretch policy, so a tempo mismatch is routed
+ * to the filter/crossfade fallback rather than altering the music.
  */
 @Suppress("UNUSED_PARAMETER")
 private fun incomingRateFor(mediaRatio: Double, advanced: Boolean): Double =
@@ -1322,8 +1319,8 @@ private fun adaptiveOverlap(
     return Overlap(
         overlap = if (traits != null) wholeBars(overlap, beatSeconds, maximumOverlap) else overlap,
         transitionBeats = transitionBeats,
-        // The timeline ratio the blend runs at; [mixPlan] splits it between
-        // the two players. Advanced stretches anything a speed-up can meet.
+        // Preserve the source playback rate. Only tempo-equivalent pairs
+        // reach the beat-matched branch; other pairs use the no-stretch ride.
         incomingPlaybackRate = when {
             traits != null -> if (traits.tempoFar) 1.0 else roundRate(1 / ratio)
             1 / ratio in MIN_INCOMING_RATE..MAX_INCOMING_RATE -> roundRate(1 / ratio)
@@ -1390,10 +1387,10 @@ private fun analysisReadyForTrack(analysis: TrackAnalysis, track: TransitionTrac
  *   handoff instead of a mix.
  * @param currentTime the outgoing track's playhead, in seconds.
  * @param advanced Advanced Automix: length from how well the pair agrees and
- *   how energetic the join is, edges on whole bars and downbeats, speed-ups
- *   of up to 10% to beat-match, an echo out where the outgoing track leaves
- *   singing, and another exit tried when the planned one sings over the
- *   incoming track. Off leaves every plan exactly as before.
+ *   how energetic the join is, edges on whole bars and downbeats when the
+ *   tempos already match, an echo out where the outgoing track leaves singing,
+ *   and another exit tried when the planned one sings over the incoming track.
+ *   Mobile playback speed is never changed. Off leaves every plan exactly as before.
  * @param phraseBars Apple-style Automix phrase length: `8` or `16` asks for a
  *   mix whose overlap is exactly that many bars of the outgoing track's own
  *   4/4 grid, both edges snapped onto phrase boundaries or downbeats. `0` (the
@@ -1704,11 +1701,11 @@ private fun mixPlan(
         analysis, nextAnalysis, traits, energy, filterVariant,
     )
     val handoffBpm = if (currentBpm > 0) currentBpm else nextBpm
-    // Advanced also blends any pair a speed-up matches on two trusted grids —
-    // the 5-10% apart that used to be left to a filter ride.
+    // A beat-matched blend is reserved for tempo-equivalent pairs; the
+    // incoming track is never sped up or slowed down to force a match.
     val sameBeatBlend = (traits == null || incomingPlaybackRate >= 1.0) && (
         currentBpm > 0 && nextBpm > 0 &&
-            abs(1 - normalizedTempoRatio(currentBpm, nextBpm)) <= 0.05 &&
+            stretchReachable(currentBpm, nextBpm) &&
             (analysis.beatConfidence.orZero() >= 0.2 || nextAnalysis.beatConfidence.orZero() >= 0.2) ||
             traits?.phaseLockable == true
         )
