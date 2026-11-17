@@ -104,12 +104,16 @@ class LoopMixTest {
         assertEquals(120.0, matched.targetBpm, 1e-9)
         assertEquals(LoopMix.MIN_RAMP_BARS, matched.rampBars)
 
-        // Close mismatches and half/double-time pairs still require tempo
-        // manipulation in this renderer, so they use the normal fallback.
+        // Even a close mismatch must not invoke the stretch renderer.
         assertNull(plan(analysis(120.0, 200.0), analysis(122.0, 180.0)))
         assertNull(plan(analysis(120.0, 200.0), analysis(134.0, 180.0)))
-        assertNull(plan(analysis(111.0, 200.0), analysis(111.0, 180.0)))
+        assertNull(plan(analysis(111.0, 200.0), analysis(169.0, 180.0)))
         assertNull(plan(analysis(170.0, 200.0), analysis(80.0, 180.0)))
+
+        // Half-time is a natural beat-grid relationship, not a playback-rate change.
+        val halfTime = assertNotNull(plan(analysis(120.0, 200.0), analysis(60.0, 180.0)))
+        assertEquals(0.5, halfTime.fold)
+        assertEquals(120.0, halfTime.targetBpm, 1e-9)
     }
 
     @Test
