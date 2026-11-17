@@ -1387,10 +1387,10 @@ private fun analysisReadyForTrack(analysis: TrackAnalysis, track: TransitionTrac
  *   handoff instead of a mix.
  * @param currentTime the outgoing track's playhead, in seconds.
  * @param advanced Advanced Automix: length from how well the pair agrees and
- *   how energetic the join is, edges on whole bars and downbeats, speed-ups
- *   of up to 10% to beat-match, an echo out where the outgoing track leaves
- *   singing, and another exit tried when the planned one sings over the
- *   incoming track. Off leaves every plan exactly as before.
+ *   how energetic the join is, edges on whole bars and downbeats when the
+ *   tempos already match, an echo out where the outgoing track leaves singing,
+ *   and another exit tried when the planned one sings over the incoming track.
+ *   Mobile playback speed is never changed. Off leaves every plan exactly as before.
  * @param phraseBars Apple-style Automix phrase length: `8` or `16` asks for a
  *   mix whose overlap is exactly that many bars of the outgoing track's own
  *   4/4 grid, both edges snapped onto phrase boundaries or downbeats. `0` (the

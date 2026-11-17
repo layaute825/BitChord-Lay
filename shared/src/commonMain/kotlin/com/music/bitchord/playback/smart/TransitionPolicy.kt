@@ -478,7 +478,7 @@ fun resolveMixOutAnchor(
 fun assessTransitionTier(
     analysis: TrackAnalysis,
     nextAnalysis: TrackAnalysis,
-    /** Advanced Automix: the same stretch window as classic ([stretchReachable]); kept for callers. */
+    /** Advanced Automix uses the same no-stretch tempo-equivalence policy as classic Automix. */
     advanced: Boolean = false,
 ): TransitionPolicyVerdict {
     val outgoingBpm = analysis.bpm.orZero()
