@@ -160,9 +160,13 @@ class AdvancedAutomixPlannerTest {
         assertEquals(1.0, plan.outgoingPlaybackRate, "an audible deck must never change speed")
         // Even a modest mismatch keeps its original playback rate in both modes.
         val near = track("c", 122.0, "C major", vocal = 0.1)
-        assertEquals(1.0, plan(current, near, advanced = false).incomingPlaybackRate)
-        assertEquals(1.0, plan(current, near, advanced = true).incomingPlaybackRate)
-        assertEquals(1.0, plan(current, near, advanced = true).outgoingPlaybackRate)
+        val classicNear = plan(current, near, advanced = false)
+        val advancedNear = plan(current, near, advanced = true)
+        assertEquals(TransitionStyle.DJ_FILTER, classicNear.transitionStyle)
+        assertEquals(TransitionStyle.DJ_FILTER, advancedNear.transitionStyle)
+        assertEquals(1.0, classicNear.incomingPlaybackRate)
+        assertEquals(1.0, advancedNear.incomingPlaybackRate)
+        assertEquals(1.0, advancedNear.outgoingPlaybackRate)
     }
 
     @Test

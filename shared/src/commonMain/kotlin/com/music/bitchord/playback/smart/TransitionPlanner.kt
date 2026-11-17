@@ -1705,7 +1705,7 @@ private fun mixPlan(
     // incoming track is never sped up or slowed down to force a match.
     val sameBeatBlend = (traits == null || incomingPlaybackRate >= 1.0) && (
         currentBpm > 0 && nextBpm > 0 &&
-            abs(1 - normalizedTempoRatio(currentBpm, nextBpm)) <= 0.05 &&
+            stretchReachable(currentBpm, nextBpm) &&
             (analysis.beatConfidence.orZero() >= 0.2 || nextAnalysis.beatConfidence.orZero() >= 0.2) ||
             traits?.phaseLockable == true
         )
