@@ -128,8 +128,8 @@ class AdvancedAutomixPlannerTest {
 
     @Test
     fun twoVocalTracksOverrideTheGestureWithVocalSafeSweep() {
-        // Within the stretch window, but the incoming grid is too weak to
-        // beatmatch on, so this is a filter ride — with two singers on it.
+        // The incoming grid is too weak to beatmatch on, so this is a filter
+        // ride — with two singers on it; neither song is time-stretched.
         val current = track("vocal-out", 120.0, "C major", vocal = 0.9, bass = 1.0)
         val next = track("vocal-in", 130.0, "C major", vocal = 0.9, bass = 1.0).copy(beatConfidence = 0.4)
         val plan = plan(current, next, advanced = true)
@@ -140,27 +140,28 @@ class AdvancedAutomixPlannerTest {
     }
 
     @Test
-    fun aSlowerIncomingSongIsSpedUpToMatch() {
+    fun tempoMismatchKeepsBothSongsAtTheirOriginalSpeed() {
         val current = track("a", 120.0, "C major", vocal = 0.1)
         val next = track("b", 111.0, "C major", vocal = 0.1)
         val plan = plan(current, next, advanced = true)
-        assertEquals(TransitionStyle.DJ_BLEND, plan.transitionStyle, "8% apart should now beat-match")
-        assertEquals(120.0 / 111.0, plan.incomingPlaybackRate, 1e-3)
+        assertEquals(TransitionStyle.DJ_FILTER, plan.transitionStyle)
+        assertEquals(1.0, plan.incomingPlaybackRate)
         assertEquals(1.0, plan.outgoingPlaybackRate)
     }
 
     @Test
     fun aFasterIncomingSongDoesNotRetempoTheAudibleOutgoingDeck() {
-        // 135 against 120 would need the incoming song slowed by 11%: past the 10% window.
+        // A tempo mismatch must use the no-stretch fallback, not slow the incoming song.
         val current = track("a", 120.0, "C major", vocal = 0.1)
         val next = track("b", 135.0, "C major", vocal = 0.1)
         val plan = plan(current, next, advanced = true)
         assertEquals(TransitionStyle.DJ_FILTER, plan.transitionStyle)
         assertEquals(1.0, plan.incomingPlaybackRate, "past the window the incoming song keeps its tempo")
         assertEquals(1.0, plan.outgoingPlaybackRate, "an audible deck must never change speed")
-        // Inside the window (130: slowed by 7.7%) both modes slow the incoming song down.
-        val near = track("c", 130.0, "C major", vocal = 0.1)
-        assertTrue(plan(current, near, advanced = false).incomingPlaybackRate < 1.0)
+        // Even a modest mismatch keeps its original playback rate in both modes.
+        val near = track("c", 122.0, "C major", vocal = 0.1)
+        assertEquals(1.0, plan(current, near, advanced = false).incomingPlaybackRate)
+        assertEquals(1.0, plan(current, near, advanced = true).incomingPlaybackRate)
         assertEquals(1.0, plan(current, near, advanced = true).outgoingPlaybackRate)
     }
 
@@ -175,10 +176,15 @@ class AdvancedAutomixPlannerTest {
     }
 
     @Test
-    fun aBlendNeverEchoes() {
+    fun matchedTempiCanBlendWithoutChangingPlaybackSpeed() {
         val current = track("a", 120.0, "C major", vocal = 0.9)
         val next = track("b", 120.0, "C major", vocal = 0.9)
-        assertEquals(0.0, plan(current, next, advanced = true).echoSeconds)
+        val plan = plan(current, next, advanced = true)
+        assertEquals(TransitionStyle.DJ_BLEND, plan.transitionStyle)
+        assertEquals(1.0, plan.incomingPlaybackRate)
+        assertEquals(1.0, plan.outgoingPlaybackRate)
+        assertTrue(!plan.phaseLock, "a blend must not pulse playback speed to chase phase")
+        assertEquals(0.0, plan.echoSeconds)
     }
 
     @Test
